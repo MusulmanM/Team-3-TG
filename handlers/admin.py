@@ -16,13 +16,13 @@ class Broadcast(StatesGroup):
 
 @admin_router.message(Command("send_all"))
 async def start_broadcast(message: types.Message, state: FSMContext):
-    await message.answer("Barcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing (matn, rasm yoki video):")
+    await message.answer(">_'Hello world'")
     await state.set_state(Broadcast.message)
 
 @admin_router.message(Broadcast.message)
 async def process_broadcast(message: types.Message, state: FSMContext, bot: Bot):
     async with async_session() as session:
-        # Barcha foydalanuvchilarning chat_id larini olish
+
         result = await session.execute(select(User.chat_id))
         users = result.scalars().all()
 
@@ -31,14 +31,14 @@ async def process_broadcast(message: types.Message, state: FSMContext, bot: Bot)
 
     for chat_id in users:
         try:
-            # Xabarni nusxasini yuborish (copy_message)
+
             await bot.copy_message(
                 chat_id=chat_id,
                 from_chat_id=message.chat.id,
                 message_id=message.message_id
             )
             count += 1
-            await asyncio.sleep(0.05) # Telegram bloklab qo'ymasligi uchun kichik pauza
+            await asyncio.sleep(0.05)
         except Exception:
             continue
 
