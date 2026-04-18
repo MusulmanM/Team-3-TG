@@ -36,7 +36,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         
     if user:
         lang = user.language or 'uz'
-        # Bu yerda foydalanuvchi ismini ham chiqaramiz
+
         await message.answer(f"{TEXTS[lang]['success']} {html.bold(user.fullname)}!")
     else:
         await message.answer("Tilni tanlang / Выберите язык / Choose language:", reply_markup=get_lang_keyboard())
@@ -58,7 +58,7 @@ async def get_name(message: types.Message, state: FSMContext):
     lang = data.get('locale', 'uz')
     
     markup = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📱 Contact", request_contact=True)]],
+        keyboard=[[KeyboardButton(text="Contact", request_contact=True)]],
         resize_keyboard=True, one_time_keyboard=True
     )
     await message.answer(TEXTS[lang]['phone'], reply_markup=markup)
@@ -74,7 +74,7 @@ async def get_phone(message: types.Message, state: FSMContext):
 
 @router.message(Register.card_number)
 async def get_card_number(message: types.Message, state: FSMContext):
-    # 🛡 XAVFSIZLIK: Foydalanuvchi yuborgan har qanday xabarni (card_number) darhol o'chirish
+
     try:
         await message.delete()
     except Exception as e:
@@ -87,7 +87,7 @@ async def get_card_number(message: types.Message, state: FSMContext):
     if len(card_no) == 16 and check_luhn(card_no):
         async with async_session() as session:
             try:
-                # 1. Userni saqlash
+
                 session.add(User(
                     fullname=data['fullname'],
                     chat_id=message.from_user.id,
@@ -95,7 +95,7 @@ async def get_card_number(message: types.Message, state: FSMContext):
                     language=lang
                 ))
 
-                # 2. Kartani saqlash
+                
                 session.add(Card(
                     card_number=card_no,
                     phone=data['phone'],
@@ -105,7 +105,7 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 
                 await session.commit()
                 
-                # Muvaffaqiyatli xabarda user ismini ko'rsatish
+                
                 success_text = f"{TEXTS[lang]['success']} {html.bold(data['fullname'])}!\n(Karta raqamingiz xavfsizlik uchun o'chirildi)"
                 await message.answer(success_text)
                 await state.clear()
@@ -115,4 +115,4 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 print(f"DB ERROR: {e}")
                 await message.answer("Xatolik! Ma'lumotlarni saqlab bo'lmadi.")
     else:
-        await message.answer("❌ Karta raqami xato yoki Luhn algoritmidan o'tmadi. Qayta kiriting:")
+        await message.answer("Karta raqami xato. Qayta kiriting:")
