@@ -19,7 +19,6 @@ class Register(StatesGroup):
     phone = State()
     card_number = State()
 
-
 def get_lang_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="🇺🇿 O'zbekcha", callback_data="lang_uz")
@@ -37,7 +36,8 @@ async def start_handler(message: types.Message, state: FSMContext):
         
     if user:
         lang = user.language or 'uz'
-        await message.answer(f"{TEXTS[lang]['success']} {user.fullname}!")
+        # Bu yerda foydalanuvchi ismini ham chiqaramiz
+        await message.answer(f"{TEXTS[lang]['success']} {html.bold(user.fullname)}!")
     else:
         await message.answer("Tilni tanlang / Выберите язык / Choose language:", reply_markup=get_lang_keyboard())
         await state.set_state(Register.language)
@@ -58,7 +58,7 @@ async def get_name(message: types.Message, state: FSMContext):
     lang = data.get('locale', 'uz')
     
     markup = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="Contact", request_contact=True)]],
+        keyboard=[[KeyboardButton(text="📱 Contact", request_contact=True)]],
         resize_keyboard=True, one_time_keyboard=True
     )
     await message.answer(TEXTS[lang]['phone'], reply_markup=markup)
@@ -74,23 +74,28 @@ async def get_phone(message: types.Message, state: FSMContext):
 
 @router.message(Register.card_number)
 async def get_card_number(message: types.Message, state: FSMContext):
+    # 🛡 XAVFSIZLIK: Foydalanuvchi yuborgan har qanday xabarni (card_number) darhol o'chirish
+    try:
+        await message.delete()
+    except Exception as e:
+        print(f"Xabarni o'chirishda xatolik: {e}")
+
     card_no = re.sub(r'\D', '', message.text)
+    data = await state.get_data()
+    lang = data.get('locale', 'uz')
     
     if len(card_no) == 16 and check_luhn(card_no):
-        data = await state.get_data()
-        lang = data.get('locale', 'uz')
-        
         async with async_session() as session:
             try:
-                
+                # 1. Userni saqlash
                 session.add(User(
                     fullname=data['fullname'],
                     chat_id=message.from_user.id,
                     phone=data['phone'],
                     language=lang
                 ))
-                
-                
+
+                # 2. Kartani saqlash
                 session.add(Card(
                     card_number=card_no,
                     phone=data['phone'],
@@ -99,7 +104,10 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 ))
                 
                 await session.commit()
-                await message.answer(TEXTS[lang]['success'])
+                
+                # Muvaffaqiyatli xabarda user ismini ko'rsatish
+                success_text = f"{TEXTS[lang]['success']} {html.bold(data['fullname'])}!\n(Karta raqamingiz xavfsizlik uchun o'chirildi)"
+                await message.answer(success_text)
                 await state.clear()
                 
             except Exception as e:
@@ -107,4 +115,4 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 print(f"DB ERROR: {e}")
                 await message.answer("Xatolik! Ma'lumotlarni saqlab bo'lmadi.")
     else:
-        await message.answer("Karta raqami xato yoki Luhn algoritmidan o'tmadi. Qayta kiriting:")
+        await message.answer("❌ Karta raqami xato yoki Luhn algoritmidan o'tmadi. Qayta kiriting:")
