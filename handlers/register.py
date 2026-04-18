@@ -19,7 +19,6 @@ class Register(StatesGroup):
     phone = State()
     card_number = State()
 
-
 def get_lang_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="🇺🇿 O'zbekcha", callback_data="lang_uz")
@@ -58,7 +57,7 @@ async def get_name(message: types.Message, state: FSMContext):
     lang = data.get('locale', 'uz')
     
     markup = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="Contact", request_contact=True)]],
+        keyboard=[[KeyboardButton(text="📱 Contact", request_contact=True)]],
         resize_keyboard=True, one_time_keyboard=True
     )
     await message.answer(TEXTS[lang]['phone'], reply_markup=markup)
@@ -77,6 +76,12 @@ async def get_card_number(message: types.Message, state: FSMContext):
     card_no = re.sub(r'\D', '', message.text)
     
     if len(card_no) == 16 and check_luhn(card_no):
+        
+        try:
+            await message.delete()
+        except Exception as e:
+            print(f"Xabarni o'chirishda xatolik: {e}")
+
         data = await state.get_data()
         lang = data.get('locale', 'uz')
         
@@ -90,7 +95,7 @@ async def get_card_number(message: types.Message, state: FSMContext):
                     language=lang
                 ))
                 
-                
+
                 session.add(Card(
                     card_number=card_no,
                     phone=data['phone'],
@@ -99,7 +104,7 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 ))
                 
                 await session.commit()
-                await message.answer(TEXTS[lang]['success'])
+                await message.answer(f"{TEXTS[lang]['success']}\n")
                 await state.clear()
                 
             except Exception as e:
@@ -107,4 +112,4 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 print(f"DB ERROR: {e}")
                 await message.answer("Xatolik! Ma'lumotlarni saqlab bo'lmadi.")
     else:
-        await message.answer("Karta raqami xato yoki Luhn algoritmidan o'tmadi. Qayta kiriting:")
+        await message.answer(" Karta raqami xato yoki Luhn algoritmidan o'tmadi. Qayta kiriting:")
