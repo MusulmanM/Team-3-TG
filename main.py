@@ -6,7 +6,10 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from config import settings
-from db.engine import engine, Base
+
+from db.engine import engine
+from db.models import Base  
+
 from utils.help_menu import set_main_menu
 
 from handlers.register import router as register_router
@@ -23,10 +26,11 @@ async def main():
 
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("Ma'lumotlar bazasi muvaffaqiyatli yaratildi!")
 
-    
+        await conn.run_sync(Base.metadata.create_all)
+    print("Ma'lumotlar bazasi va jadvallar PostgreSQL'da muvaffaqiyatli yaratildi!")
+
+
     bot = Bot(
         token=settings.BOT_TOKEN, 
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
