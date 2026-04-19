@@ -5,11 +5,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-
 from config import settings
 from db.engine import engine, Base
 from utils.help_menu import set_main_menu
-
 
 from handlers.register import router as register_router
 from handlers.menu import menu_router
@@ -26,9 +24,9 @@ async def main():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("Ma'lumotlar bazasi va jadvallar muvaffaqiyatli yaratildi!")
+    print("Ma'lumotlar bazasi muvaffaqiyatli yaratildi!")
 
-
+    
     bot = Bot(
         token=settings.BOT_TOKEN, 
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -48,8 +46,8 @@ async def main():
 
     await bot.delete_webhook(drop_pending_updates=True)
     
-
     try:
+
         await dp.start_polling(bot)
     finally:
 
@@ -59,4 +57,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        print("\nBot to'xtatildi!")
+        logging.info("Bot to'xtatildi!")
