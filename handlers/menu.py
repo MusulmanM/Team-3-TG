@@ -1,11 +1,11 @@
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, update
+from sqlalchemy import select, desc
 from datetime import datetime
 
 from db.engine import async_session
-from db.models import User, Card, Transaction # Transaction modelini ham import qiling
+from db.models import User, Card, Transaction  # Transaction modelini import qilishni unutmang
 from config import settings
 
 menu_router = Router()
@@ -21,7 +21,7 @@ async def show_my_cards(message: types.Message):
             await message.answer("⚠️ Avval ro'yxatdan o'ting: /start")
             return
 
-        # User telefoniga bog'langan kartalarni topish
+        # Foydalanuvchi telefoniga bog'langan barcha kartalarni olish
         cards_query = select(Card).where(Card.phone == user.phone)
         result = await session.execute(cards_query)
         cards = result.scalars().all()
@@ -29,7 +29,7 @@ async def show_my_cards(message: types.Message):
     if cards:
         txt = "💳 <b>Sizning kartalaringiz:</b>\n\n"
         for i, card in enumerate(cards, 1):
-            # Karta raqamini yashirish (masalan: 8600 **** **** 1234)
+            # Karta raqamini qisman yashirish
             c_num = card.card_number
             hidden_num = f"{c_num[:4]} **** **** {c_num[-4:]}"
             
@@ -43,20 +43,19 @@ async def show_my_cards(message: types.Message):
     else:
         await message.answer("❌ Sizda hali karta ulanmagan.")
 
-# --- PRAKTIKA UCHUN SIMULYATSIYA KOMANDALARI ---
-
 @menu_router.message(Command("pay_in", "pay_out"))
 async def simulate_transaction(message: types.Message):
+    """ Praktika uchun pul tushishi va yechilishini simulyatsiya qilish """
     is_income = message.text == "/pay_in"
-    amount = 50000.0 if is_income else 20000.0
+    amount = 50000.0 if is_income else 20000.0 # Test uchun summalar
     
     async with async_session() as session:
-        # Foydalanuvchining birinchi kartasini olamiz
         user_query = select(User).where(User.chat_id == message.from_user.id)
         user = (await session.execute(user_query)).scalar()
         
         if not user: return
         
+        # Userning birinchi kartasini tanlab olamiz
         card_query = select(Card).where(Card.phone == user.phone).limit(1)
         card = (await session.execute(card_query)).scalar()
         
@@ -64,25 +63,29 @@ async def simulate_transaction(message: types.Message):
             await message.answer("Simulyatsiya uchun avval karta qo'shilgan bo'lishi kerak.")
             return
 
-        # 1. Balansni o'zgartirish
+        # 1. Balansni yangilash
         if is_income:
             card.balance += amount
             trans_type = "tushum"
         else:
             if card.balance < amount:
-                await message.answer("Mablag' yetarli emas!")
+                await message.answer("⚠️ Mablag' yetarli emas!")
                 return
             card.balance -= amount
             trans_type = "yechildi"
 
-        # 2. Transaction modeliga yozish
-        new_trans = Transaction(card_id=card.id, amount=amount, type=trans_type)
+        # 2. Transaction (tarix) jadvaliga yozish
+        new_trans = Transaction(
+            card_id=card.id,
+            amount=amount,
+            type=trans_type
+        )
         session.add(new_trans)
         
         current_balance = card.balance
         await session.commit()
 
-    # 3. SMS Xabarnoma
+    # 3. SMS ko'rinishida xabar yuborish
     date_now = datetime.now().strftime("%d.%m.%Y %H:%M")
     status_icon = "📈" if is_income else "📉"
     prefix = "+" if is_income else "-"
@@ -98,6 +101,42 @@ async def simulate_transaction(message: types.Message):
     )
     await message.answer(sms_text, parse_mode="HTML")
 
+@menu_router.message(Command("history"))
+async def show_history(message: types.Message):
+    """ Oxirgi 5 ta tranzaksiyani ko'rish """
+    async with async_session() as session:
+        user_query = select(User).where(User.chat_id == message.from_user.id)
+        user = (await session.execute(user_query)).scalar()
+        
+        if not user: return
+        
+        card_query = select(Card).where(Card.phone == user.phone).limit(1)
+        card = (await session.execute(card_query)).scalar()
+        
+        if not card:
+            await message.answer("Karta topilmadi.")
+            return
+
+        # Oxirgi tranzaksiyalarni olish
+        trans_query = (
+            select(Transaction)
+            .where(Transaction.card_id == card.id)
+            .order_by(desc(Transaction.created_at))
+            .limit(5)
+        )
+        transactions = (await session.execute(trans_query)).scalars().all()
+
+    if transactions:
+        txt = f"📜 <b>Oxirgi operatsiyalar (Karta: ..{card.card_number[-4:]}):</b>\n\n"
+        for tr in transactions:
+            icon = "🟢" if tr.type == 'tushum' else "🔴"
+            sign = "+" if tr.type == 'tushum' else "-"
+            date = tr.created_at.strftime("%d.%m %H:%M")
+            txt += f"{icon} {date} | <b>{sign}{tr.amount:,}</b> UZS\n"
+        await message.answer(txt, parse_mode="HTML")
+    else:
+        await message.answer("📭 Tranzaksiyalar tarixi bo'sh.")
+
 @menu_router.message(Command("help"))
 async def help_command(message: types.Message):
     builder = InlineKeyboardBuilder()
@@ -106,9 +145,11 @@ async def help_command(message: types.Message):
     txt = (
         "❓ <b>Yordam bo'limi:</b>\n\n"
         "🔹 /start - Botni ishga tushirish\n"
-        "🔹 /my_cards - Kartalar ro'yxati va balans\n"
-        "🔹 /pay_in - +50,000 so'm (Simulyatsiya)\n"
-        "🔹 /pay_out - -20,000 so'm (Simulyatsiya)\n\n"
-        "Savollaringiz bo'lsa, adminga murojaat qiling."
+        "🔹 /my_cards - Mening kartalarim\n"
+        "🔹 /history - Tranzaksiyalar tarixi\n"
+        "🔹 /pay_in - Pul tushishini simulyatsiya qilish\n"
+        "🔹 /pay_out - Pul yechilishini simulyatsiya qilish\n\n"
+        "Savollaringiz bo'lsa, admin bilan bog'laning."
     )
+    
     await message.answer(txt, reply_markup=builder.as_markup(), parse_mode="HTML")
