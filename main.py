@@ -6,11 +6,11 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from config import settings
-
 from db.engine import engine
-from db.models import Base  
+from db.models import Base
 
 from utils.help_menu import set_main_menu
+
 
 from handlers.register import router as register_router
 from handlers.menu import menu_router
@@ -28,7 +28,8 @@ async def main():
     async with engine.begin() as conn:
 
         await conn.run_sync(Base.metadata.create_all)
-    print("Ma'lumotlar bazasi va jadvallar PostgreSQL'da muvaffaqiyatli yaratildi!")
+    
+    logging.info("Ma'lumotlar bazasi va jadvallar muvaffaqiyatli tekshirildi/yaratildi!")
 
 
     bot = Bot(
@@ -45,7 +46,7 @@ async def main():
 
     await set_main_menu(bot)
 
-    print("Bot muvaffaqiyatli ishga tushdi!")
+    logging.info("Bot muvaffaqiyatli ishga tushdi!")
     
 
     await bot.delete_webhook(drop_pending_updates=True)
@@ -53,6 +54,8 @@ async def main():
     try:
 
         await dp.start_polling(bot)
+    except Exception as e:
+        logging.error(f"Bot ishlashida xatolik: {e}")
     finally:
 
         await bot.session.close()
@@ -61,4 +64,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        logging.info("Bot to'xtatildi!")
+        logging.info("Bot foydalanuvchi tomonidan to'xtatildi!")
