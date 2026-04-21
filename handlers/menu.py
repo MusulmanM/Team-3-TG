@@ -5,7 +5,7 @@ from sqlalchemy import select, desc
 from datetime import datetime
 
 from db.engine import async_session
-from db.models import User, Card, Transaction  # Transaction modelini import qilishni unutmang
+from db.models import User, Card, Transaction  
 from config import settings
 
 menu_router = Router()
@@ -85,7 +85,7 @@ async def simulate_transaction(message: types.Message):
         current_balance = card.balance
         await session.commit()
 
-    # 3. SMS ko'rinishida xabar yuborish
+
     date_now = datetime.now().strftime("%d.%m.%Y %H:%M")
     status_icon = "📈" if is_income else "📉"
     prefix = "+" if is_income else "-"
