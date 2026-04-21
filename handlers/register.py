@@ -36,7 +36,6 @@ async def start_handler(message: types.Message, state: FSMContext):
         
     if user:
         lang = user.language or 'uz'
-
         await message.answer(f"{TEXTS[lang]['success']} {html.bold(user.fullname)}!")
     else:
         await message.answer("Tilni tanlang / Выберите язык / Choose language:", reply_markup=get_lang_keyboard())
@@ -58,7 +57,7 @@ async def get_name(message: types.Message, state: FSMContext):
     lang = data.get('locale', 'uz')
     
     markup = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="Contact", request_contact=True)]],
+        keyboard=[[KeyboardButton(text=TEXTS[lang]['contact_btn'], request_contact=True)]],
         resize_keyboard=True, one_time_keyboard=True
     )
     await message.answer(TEXTS[lang]['phone'], reply_markup=markup)
@@ -69,16 +68,19 @@ async def get_name(message: types.Message, state: FSMContext):
 async def get_phone(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number if message.contact else message.text
     await state.update_data(phone=phone)
-    await message.answer("Karta raqamingizni kiriting (16 xonali):", reply_markup=types.ReplyKeyboardRemove())
+    
+    data = await state.get_data()
+    lang = data.get('locale', 'uz')
+    
+    await message.answer(TEXTS[lang]['card_req'], reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(Register.card_number)
 
 @router.message(Register.card_number)
 async def get_card_number(message: types.Message, state: FSMContext):
-
     try:
         await message.delete()
-    except Exception as e:
-        print(f"Xabarni o'chirishda xatolik: {e}")
+    except:
+        pass
 
     card_no = re.sub(r'\D', '', message.text)
     data = await state.get_data()
@@ -95,7 +97,7 @@ async def get_card_number(message: types.Message, state: FSMContext):
                     language=lang
                 ))
 
-                
+
                 session.add(Card(
                     card_number=card_no,
                     phone=data['phone'],
@@ -105,14 +107,13 @@ async def get_card_number(message: types.Message, state: FSMContext):
                 
                 await session.commit()
                 
-                
-                success_text = f"{TEXTS[lang]['success']} {html.bold(data['fullname'])}!\n(Karta raqamingiz xavfsizlik uchun o'chirildi)"
-                await message.answer(success_text)
+                success_msg = f"{TEXTS[lang]['success']}{html.bold(data['fullname'])}!{TEXTS[lang]['card_safety']}"
+                await message.answer(success_msg)
                 await state.clear()
                 
             except Exception as e:
                 await session.rollback()
                 print(f"DB ERROR: {e}")
-                await message.answer("Xatolik! Ma'lumotlarni saqlab bo'lmadi.")
+                await message.answer(TEXTS[lang]['db_error'])
     else:
-        await message.answer("Karta raqami xato. Qayta kiriting:")
+        await message.answer(TEXTS[lang]['card_error'])
